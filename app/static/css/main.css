@@ -1,0 +1,44 @@
+/* Custom styles – Tailwind loaded via CDN in base template */
+body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.form-input {
+    flex: 1 1 0%;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(68 64 60);
+    background-color: rgb(28 25 23);
+    padding: 0.75rem 1rem;
+    color: rgb(245 245 244);
+}
+.form-input::placeholder {
+    color: rgb(120 113 108);
+}
+.form-input:focus {
+    outline: none;
+    border-color: rgb(245 158 11);
+    box-shadow: 0 0 0 1px rgb(245 158 11);
+}
+
+.btn-primary {
+    border-radius: 0.5rem;
+    background-color: rgb(245 158 11);
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    color: rgb(28 25 23);
+}
+.btn-primary:hover {
+    background-color: rgb(251 191 36);
+}
+.btn-primary:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(251 191 36), 0 0 0 4px rgb(10 10 10);
+}
+
+.embed-wrap iframe {
+    max-width: 100%;
+}
+.embed-wrap .tiktok-embed,
+.embed-wrap blockquote {
+    margin: 0 auto;
+}
