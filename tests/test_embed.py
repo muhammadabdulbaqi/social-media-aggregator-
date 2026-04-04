@@ -1,6 +1,6 @@
 """Tests for embed detection and oEmbed cache helpers."""
 import unittest
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from app import create_app, db
@@ -9,6 +9,7 @@ from app.services.embed import (
     apply_oembed_cache_fields,
     detect_platform,
     extract_youtube_video_id,
+    normalize_utc,
     refresh_embed_if_stale,
     utcnow,
 )
@@ -39,8 +40,26 @@ class TestDetectPlatform(unittest.TestCase):
             "tiktok",
         )
 
+    def test_tiktok_short_or_vm_host(self) -> None:
+        self.assertEqual(
+            detect_platform("https://vm.tiktok.com/ZMabc123xyz/"),
+            "tiktok",
+        )
+
     def test_unsupported(self) -> None:
         self.assertIsNone(detect_platform("https://example.com/"))
+
+
+class TestNormalizeUtc(unittest.TestCase):
+    def test_naive_treated_as_utc(self) -> None:
+        naive = datetime(2020, 1, 1, 12, 0, 0)
+        n = normalize_utc(naive)
+        self.assertIsNotNone(n)
+        self.assertEqual(n.tzinfo, timezone.utc)
+        self.assertEqual(n.year, 2020)
+
+    def test_none_stays_none(self) -> None:
+        self.assertIsNone(normalize_utc(None))
 
 
 class TestExtractYoutube(unittest.TestCase):
@@ -101,6 +120,23 @@ class TestOembedCache(unittest.TestCase):
         link.expires_at = now + timedelta(days=365)
         out = refresh_embed_if_stale(link)
         self.assertFalse(out)
+
+    @patch("app.services.embed.fetch_embed")
+    def test_refresh_skips_when_fresh_naive_expires_from_sqlite(self, mock_fetch) -> None:
+        """SQLite returns naive datetimes; must not crash or refetch when still valid."""
+        link = Link(
+            url="https://x.com/a/status/1",
+            platform="twitter",
+            embed_html="<p>old</p>",
+            video_id=None,
+            title=None,
+        )
+        future = utcnow() + timedelta(days=365)
+        link.fetched_at = future - timedelta(hours=1)
+        link.expires_at = future.replace(tzinfo=None)
+        out = refresh_embed_if_stale(link)
+        self.assertFalse(out)
+        mock_fetch.assert_not_called()
 
     @patch("app.services.embed.fetch_embed")
     def test_refresh_when_expired(self, mock_fetch) -> None:
