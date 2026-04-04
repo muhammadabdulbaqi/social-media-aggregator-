@@ -14,6 +14,9 @@ class Link(db.Model):
     video_id = db.Column(db.String(64), nullable=True)  # YouTube only
     title = db.Column(db.String(512), nullable=True)
     created_at = db.Column(db.DateTime, default=db.func.now())
+    # oEmbed fetch time and cache expiry (YouTube uses iframe + video_id; expires_at is null).
+    fetched_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     def __repr__(self) -> str:
         return f"<Link {self.platform} {self.url[:50]!r}>"

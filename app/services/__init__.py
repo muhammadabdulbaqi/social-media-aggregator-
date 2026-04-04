@@ -1,4 +1,14 @@
 """Services package."""
-from app.services.embed import detect_platform, fetch_embed
+from app.services.embed import (
+    apply_oembed_cache_fields,
+    detect_platform,
+    fetch_embed,
+    refresh_embed_if_stale,
+)
 
-__all__ = ["detect_platform", "fetch_embed"]
+__all__ = [
+    "apply_oembed_cache_fields",
+    "detect_platform",
+    "fetch_embed",
+    "refresh_embed_if_stale",
+]

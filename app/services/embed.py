@@ -1,9 +1,18 @@
 """Embed service: platform detection and oEmbed/iframe fetch."""
+from __future__ import annotations
+
+import logging
 import re
-from typing import Tuple
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Tuple
 
 import requests
 from flask import current_app
+
+if TYPE_CHECKING:
+    from app.models.link import Link
+
+logger = logging.getLogger(__name__)
 
 
 YOUTUBE_PATTERNS = [
@@ -112,3 +121,41 @@ def fetch_embed(url: str, platform: str) -> Tuple[str | None, str | None, str | 
         return data.get("html"), None, None
 
     raise ValueError(f"Unsupported platform: {platform}")
+
+
+def utcnow() -> datetime:
+    """Timezone-aware UTC \"now\" for cache timestamps."""
+    return datetime.now(timezone.utc)
+
+
+def apply_oembed_cache_fields(link: Link, platform: str) -> None:
+    """Set fetched_at / expires_at after a successful embed fetch (mutates link in place)."""
+    link.fetched_at = utcnow()
+    if platform == "youtube":
+        link.expires_at = None
+        return
+    ttl_sec = int(current_app.config.get("OEMBED_CACHE_TTL_SECONDS", 86400))
+    link.expires_at = link.fetched_at + timedelta(seconds=ttl_sec)
+
+
+def refresh_embed_if_stale(link: Link) -> bool:
+    """
+    For oEmbed-backed platforms, refetch if cache is missing or past expires_at.
+    YouTube is unchanged (iframe uses video_id). Returns True if link was updated.
+    """
+    if link.platform == "youtube":
+        return False
+    now = utcnow()
+    if link.expires_at is not None and link.expires_at > now:
+        return False
+    try:
+        embed_html, video_id, title = fetch_embed(link.url, link.platform)
+    except Exception as e:
+        logger.warning("oEmbed refresh failed for link id=%s: %s", link.id, e)
+        return False
+    link.embed_html = embed_html
+    link.video_id = video_id
+    if title is not None:
+        link.title = title
+    apply_oembed_cache_fields(link, link.platform)
+    return True

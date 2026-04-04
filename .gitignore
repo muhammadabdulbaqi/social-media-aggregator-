@@ -49,3 +49,16 @@ htmlcov/
 *.db
 *.sqlite3
 *.log
+
+# Documents
+*.md
+*.docx
+*.doc
+*.txt
+*.md
+*.csv
+*.xls
+*.xlsx
+*.pptx
+*.ppt
+*.pps
