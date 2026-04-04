@@ -13,6 +13,8 @@ class Link(db.Model):
     embed_html = db.Column(db.Text, nullable=True)
     video_id = db.Column(db.String(64), nullable=True)  # YouTube only
     title = db.Column(db.String(512), nullable=True)
+    # Order within the same platform (lower = earlier). Drag-and-drop updates this.
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=db.func.now())
     # oEmbed fetch time and cache expiry (YouTube uses iframe + video_id; expires_at is null).
     fetched_at = db.Column(db.DateTime(timezone=True), nullable=True)

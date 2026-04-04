@@ -1,0 +1,51 @@
+{# expects: link #}
+<li
+    class="link-card-item card relative"
+    data-link-id="{{ link.id }}"
+>
+    <div class="flex items-start justify-between gap-2 mb-2">
+        <button
+            type="button"
+            class="drag-handle shrink-0 rounded-md border border-stone-600 bg-stone-800/80 px-2 py-1 text-stone-400 hover:bg-stone-700 hover:text-stone-200 cursor-grab active:cursor-grabbing touch-manipulation"
+            aria-label="Drag to reorder"
+            title="Drag to reorder"
+        >
+            <span class="inline-block select-none" aria-hidden="true">⠿</span>
+        </button>
+        <form
+            method="post"
+            action="{{ url_for('main.delete_link', link_id=link.id) }}"
+            class="shrink-0"
+            onsubmit="return confirm('Remove this embed from your feed?');"
+        >
+            <button
+                type="submit"
+                class="rounded-md border border-stone-600 bg-stone-900 px-2 py-1 text-xs text-stone-400 hover:border-red-500/50 hover:text-red-300"
+            >
+                Remove
+            </button>
+        </form>
+    </div>
+    <div class="embed-wrap flex justify-center min-h-[200px]">
+        {% if link.platform == 'youtube' and link.video_id %}
+        <iframe
+            width="560"
+            height="315"
+            src="https://www.youtube.com/embed/{{ link.video_id }}"
+            title="YouTube video"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            class="w-full aspect-video max-w-full rounded-lg"
+        ></iframe>
+        {% elif link.embed_html %}
+        <div class="w-full [&>blockquote]:mx-auto [&_.twitter-tweet]:mx-auto">
+            {{ link.embed_html | safe }}
+        </div>
+        {% endif %}
+    </div>
+    {% if link.title %}
+    <p class="mt-3 text-sm text-stone-400 truncate" title="{{ link.title }}">{{ link.title }}</p>
+    {% endif %}
+    <a href="{{ link.url }}" target="_blank" rel="noopener" class="mt-1 block text-xs text-amber-500 hover:text-amber-400 truncate">{{ link.url }}</a>
+</li>

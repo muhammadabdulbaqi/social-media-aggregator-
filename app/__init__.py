@@ -32,6 +32,25 @@ def _ensure_link_oembed_cache_columns() -> None:
             conn.execute(text(sql))
 
 
+def _ensure_link_sort_order_column() -> None:
+    """Add sort_order for per-platform ordering (drag-and-drop)."""
+    engine = db.engine
+    insp = inspect(engine)
+    if "links" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("links")}
+    if "sort_order" in cols:
+        return
+    dialect = engine.dialect.name
+    # SQLite: INTEGER NOT NULL DEFAULT 0; Postgres: same idea
+    if dialect == "sqlite":
+        sql = "ALTER TABLE links ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"
+    else:
+        sql = "ALTER TABLE links ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"
+    with engine.begin() as conn:
+        conn.execute(text(sql))
+
+
 def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the Flask application."""
     app = Flask(
@@ -54,5 +73,9 @@ def create_app(config_name: str | None = None) -> Flask:
     with app.app_context():
         db.create_all()
         _ensure_link_oembed_cache_columns()
+        _ensure_link_sort_order_column()
+        from app.feed import backfill_sort_order_if_needed
+
+        backfill_sort_order_if_needed()
 
     return app

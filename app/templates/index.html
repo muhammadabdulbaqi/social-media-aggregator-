@@ -5,16 +5,16 @@
 {% block content %}
 <header class="mb-10">
     <h1 class="text-3xl font-semibold text-stone-100 tracking-tight">Link aggregator</h1>
-    <p class="mt-1 text-stone-400">Paste a YouTube, X (Twitter), or TikTok link to embed it below.</p>
+    <p class="mt-1 text-stone-400">Paste a YouTube, X (Twitter), or TikTok link to embed it below. Drag cards or section headers to organize; layout and size are saved in this browser.</p>
 </header>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}
-<div class="mb-6 rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-amber-200">
-    {% for category, msg in messages %}
+{% for category, msg in messages %}
+<div class="mb-3 rounded-lg border px-4 py-3 last:mb-6 {% if category == 'error' %}border-amber-500/50 bg-amber-500/10 text-amber-200{% else %}border-emerald-500/40 bg-emerald-500/10 text-emerald-200{% endif %}">
     <p>{{ msg }}</p>
-    {% endfor %}
 </div>
+{% endfor %}
 {% endif %}
 {% endwith %}
 
@@ -31,38 +31,50 @@
     </div>
 </form>
 
-{% if links %}
-<section class="space-y-6">
-    <h2 class="text-lg font-medium text-stone-300">Embedded links</h2>
-    <ul class="grid gap-6 sm:grid-cols-2">
-        {% for link in links %}
-        <li class="card">
-            <div class="embed-wrap flex justify-center min-h-[200px]">
-                {% if link.platform == 'youtube' and link.video_id %}
-                <iframe
-                    width="560"
-                    height="315"
-                    src="https://www.youtube.com/embed/{{ link.video_id }}"
-                    title="YouTube video"
-                    frameborder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen
-                    class="w-full aspect-video max-w-full rounded-lg"
-                ></iframe>
-                {% elif link.embed_html %}
-                <div class="w-full [&>blockquote]:mx-auto [&_.twitter-tweet]:mx-auto">
-                    {{ link.embed_html | safe }}
-                </div>
-                {% endif %}
+{% if platform_order %}
+<div
+    id="feed-root"
+    class="feed-root"
+    data-layout="grid"
+    data-density="comfortable"
+>
+    <div class="flex flex-wrap items-center gap-2 gap-y-3 mb-8 text-sm text-stone-400 border-b border-stone-800 pb-6">
+        <span class="w-full sm:w-auto font-medium text-stone-500">Layout</span>
+        <button type="button" data-layout-set="grid" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">Grid</button>
+        <button type="button" data-layout-set="list" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">List (vertical)</button>
+        <span class="w-full sm:w-auto sm:ml-4 font-medium text-stone-500">Size</span>
+        <button type="button" data-density-set="compact" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">Compact</button>
+        <button type="button" data-density-set="comfortable" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">Comfortable</button>
+        <button type="button" data-density-set="spacious" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">Spacious</button>
+    </div>
+
+    <div id="platform-sections" class="space-y-12">
+        {% for platform in platform_order %}
+        <section class="platform-section" data-platform="{{ platform }}">
+            <div class="flex flex-wrap items-center gap-3 mb-4 pb-3 border-b border-stone-700/90">
+                <button
+                    type="button"
+                    class="section-drag-handle rounded-md border border-stone-600 bg-stone-800/80 px-2 py-1.5 text-stone-400 hover:bg-stone-700 hover:text-stone-200 cursor-grab active:cursor-grabbing touch-manipulation"
+                    aria-label="Drag to reorder section"
+                    title="Drag section"
+                >
+                    <span class="select-none" aria-hidden="true">☰</span>
+                </button>
+                <h2 class="text-lg font-medium text-stone-100">{{ platform_labels.get(platform, platform) }}</h2>
+                <span class="text-xs text-stone-500 max-sm:hidden">Drag ☰ to reorder sections. Drag ⠿ on cards within this group.</span>
             </div>
-            {% if link.title %}
-            <p class="mt-3 text-sm text-stone-400 truncate" title="{{ link.title }}">{{ link.title }}</p>
-            {% endif %}
-            <a href="{{ link.url }}" target="_blank" rel="noopener" class="mt-1 block text-xs text-amber-500 hover:text-amber-400 truncate">{{ link.url }}</a>
-        </li>
+            <ul
+                class="sortable-link-list link-list-ul list-none p-0 m-0"
+                data-platform="{{ platform }}"
+            >
+                {% for link in link_groups[platform] %}
+                {% include "_link_card.html" %}
+                {% endfor %}
+            </ul>
+        </section>
         {% endfor %}
-    </ul>
-</section>
+    </div>
+</div>
 {% else %}
 <section class="rounded-xl border border-dashed border-stone-600 bg-stone-900/30 py-16 text-center">
     <p class="text-stone-500">No links yet. Paste a YouTube, X, or TikTok URL above and click Add link.</p>
@@ -71,8 +83,12 @@
 {% endblock %}
 
 {% block scripts %}
-{% if links and links|selectattr('platform', 'equalto', 'twitter')|list %}
+{% if platform_order and 'twitter' in platform_order %}
 <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 <script src="{{ url_for('static', filename='js/twitter-embed.js') }}"></script>
+{% endif %}
+{% if platform_order %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='js/feed-layout.js') }}"></script>
 {% endif %}
 {% endblock %}
