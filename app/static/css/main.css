@@ -85,3 +85,15 @@ body {
 .sortable-link-list .sortable-ghost {
     opacity: 0.45;
 }
+
+/* Settings drawer + drag/remove — drawer opens via gear; handles only when open */
+.feed-root:not(.feed-settings-visible) .feed-settings-drawer,
+.feed-root:not(.feed-settings-visible) .section-drag-handle,
+.feed-root:not(.feed-settings-visible) .feed-drag-hint,
+.feed-root:not(.feed-settings-visible) .link-card-toolbar {
+    display: none;
+}
+
+.feed-settings-icon-btn svg {
+    pointer-events: none;
+}

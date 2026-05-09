@@ -1,5 +1,5 @@
 """Main routes: index and add link."""
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, make_response, redirect, render_template, request, url_for
 
 from app import db
 from app.feed import (
@@ -7,6 +7,7 @@ from app.feed import (
     group_links_by_platform,
     next_sort_order_for_platform,
     ordered_platform_keys,
+    sort_links_for_unified_view,
 )
 from app.models import Link
 from app.services import (
@@ -17,6 +18,9 @@ from app.services import (
 )
 
 main = Blueprint("main", __name__)
+
+VIEW_MODE_COOKIE = "aggregator_view"
+UNIFIED_SORT_COOKIE = "aggregator_unified_sort"
 
 
 @main.route("/")
@@ -30,14 +34,34 @@ def index():
     if updated:
         db.session.commit()
 
+    view_mode = request.cookies.get(VIEW_MODE_COOKIE, "platform")
+    unified_sort = request.cookies.get(UNIFIED_SORT_COOKIE, "recent")
+    if view_mode not in ("platform", "unified"):
+        view_mode = "platform"
+    if unified_sort not in ("recent", "oldest"):
+        unified_sort = "recent"
+
     link_groups = group_links_by_platform(links)
     platform_order = ordered_platform_keys(link_groups)
-    return render_template(
+    unified_links = sort_links_for_unified_view(links, unified_sort) if links else []
+    feed_has_links = bool(links)
+    has_twitter_embeds = any(l.platform == "twitter" for l in links)
+
+    html = render_template(
         "index.html",
         link_groups=link_groups,
         platform_order=platform_order,
         platform_labels=PLATFORM_LABELS,
+        view_mode=view_mode,
+        unified_sort=unified_sort,
+        unified_links=unified_links,
+        feed_has_links=feed_has_links,
+        has_twitter_embeds=has_twitter_embeds,
     )
+    resp = make_response(html)
+    if current_app.debug:
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+    return resp
 
 
 @main.route("/add", methods=["POST"])
