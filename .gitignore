@@ -52,6 +52,10 @@ htmlcov/
 
 # Documents
 *.md
+
+# Local sprint checklist (explicit filename if *.md rules change)
+MAY_CHECKLIST.md
+MAY_CHELIST.md
 *.docx
 *.doc
 *.txt
