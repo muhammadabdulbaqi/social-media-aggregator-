@@ -27,8 +27,24 @@ def group_links_by_platform(links: list[Link]) -> dict[str, list[Link]]:
 
 
 def ordered_platform_keys(groups: dict[str, list[Link]]) -> list[str]:
-    """Platforms that have links, in canonical order."""
-    return [p for p in DEFAULT_PLATFORM_ORDER if p in groups and groups[p]]
+    """Platforms that have links: canonical order first, then any other keys (legacy or future)."""
+    canonical = [p for p in DEFAULT_PLATFORM_ORDER if p in groups and groups[p]]
+    seen = set(canonical)
+    rest = sorted(p for p in groups if groups[p] and p not in seen)
+    return canonical + rest
+
+
+def sort_links_for_unified_view(links: list[Link], unified_sort: str) -> list[Link]:
+    """Single-feed order: newest or oldest first (stable tie-breaker by id)."""
+    lst = list(links)
+    reverse = unified_sort != "oldest"
+
+    def sort_key(L: Link) -> tuple[float, int]:
+        ts = L.created_at.timestamp() if L.created_at else 0.0
+        return (ts, L.id)
+
+    lst.sort(key=sort_key, reverse=reverse)
+    return lst
 
 
 def next_sort_order_for_platform(platform: str) -> int:

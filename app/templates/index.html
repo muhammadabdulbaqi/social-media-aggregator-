@@ -3,9 +3,10 @@
 {% block title %}Link aggregator{% endblock %}
 
 {% block content %}
+{% set unified_sort_label = 'Newest first' if unified_sort == 'recent' else 'Oldest first' %}
 <header class="mb-10">
     <h1 class="text-3xl font-semibold text-stone-100 tracking-tight">Link aggregator</h1>
-    <p class="mt-1 text-stone-400">Paste a YouTube, X (Twitter), or TikTok link to embed it below. Drag cards or section headers to organize; layout and size are saved in this browser.</p>
+    <p class="mt-1 text-stone-400">Paste a YouTube, X (Twitter), or TikTok link to embed it below.</p>
 </header>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -31,24 +32,97 @@
     </div>
 </form>
 
-{% if platform_order %}
+{% if feed_has_links %}
 <div
     id="feed-root"
     class="feed-root"
     data-layout="grid"
     data-density="comfortable"
+    data-view-mode="{{ view_mode }}"
+    data-unified-sort="{{ unified_sort }}"
 >
-    <div class="flex flex-wrap items-center gap-2 gap-y-3 mb-8 text-sm text-stone-400 border-b border-stone-800 pb-6">
-        <span class="w-full sm:w-auto font-medium text-stone-500">Layout</span>
-        <button type="button" data-layout-set="grid" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">Grid</button>
-        <button type="button" data-layout-set="list" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">List (vertical)</button>
-        <span class="w-full sm:w-auto sm:ml-4 font-medium text-stone-500">Size</span>
-        <button type="button" data-density-set="compact" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">Compact</button>
-        <button type="button" data-density-set="comfortable" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">Comfortable</button>
-        <button type="button" data-density-set="spacious" class="rounded-lg border border-stone-600 bg-stone-900 px-3 py-1.5 hover:bg-stone-800">Spacious</button>
+    <div class="flex flex-wrap items-center justify-end gap-3 mb-4">
+        <button
+            type="button"
+            id="feed-settings-toggle"
+            class="feed-settings-icon-btn inline-flex h-10 w-10 items-center justify-center rounded-lg border border-stone-600 bg-stone-900 text-stone-300 hover:bg-stone-800 hover:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+            aria-expanded="false"
+            aria-controls="feed-settings-drawer"
+            title="Feed settings"
+        >
+            <span class="sr-only">Feed settings</span>
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+        </button>
+    </div>
+
+    <div
+        id="feed-settings-drawer"
+        class="feed-settings-drawer mb-8 rounded-xl border border-stone-700/90 bg-stone-900/80 p-5 shadow-lg shadow-black/20"
+        role="region"
+        aria-label="Feed settings"
+    >
+        <p class="mb-4 text-xs text-stone-500">Layout and density apply in this browser. Grouping and single-feed sort are saved as cookies and reload the page.</p>
+
+        <div class="grid gap-6 sm:grid-cols-2">
+            <fieldset class="min-w-0 space-y-2 border-0 p-0">
+                <legend class="text-sm font-medium text-stone-400">Grouping</legend>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" data-view-set="platform" class="rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-sm text-stone-200 hover:bg-stone-800">By platform</button>
+                    <button type="button" data-view-set="unified" class="rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-sm text-stone-200 hover:bg-stone-800">Single feed</button>
+                </div>
+                <p class="text-xs text-stone-600">Single feed merges every link into one list (sorted by when it was added).</p>
+            </fieldset>
+
+            <fieldset class="min-w-0 space-y-2 border-0 p-0 unified-sort-fieldset {% if view_mode != 'unified' %}opacity-50{% endif %}">
+                <legend class="text-sm font-medium text-stone-400">Single-feed order</legend>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" data-unified-sort-set="recent" class="rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-sm text-stone-200 hover:bg-stone-800">Newest first</button>
+                    <button type="button" data-unified-sort-set="oldest" class="rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-sm text-stone-200 hover:bg-stone-800">Oldest first</button>
+                </div>
+                {% if view_mode != 'unified' %}
+                <p class="text-xs text-amber-500/90">Switch to Single feed to use this.</p>
+                {% else %}
+                <p class="text-xs text-stone-600">Drag-to-reorder applies when grouped by platform.</p>
+                {% endif %}
+            </fieldset>
+
+            <fieldset class="min-w-0 space-y-2 border-0 p-0">
+                <legend class="text-sm font-medium text-stone-400">Layout</legend>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" data-layout-set="grid" class="rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-sm text-stone-200 hover:bg-stone-800">Grid</button>
+                    <button type="button" data-layout-set="list" class="rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-sm text-stone-200 hover:bg-stone-800">List</button>
+                </div>
+            </fieldset>
+
+            <fieldset class="min-w-0 space-y-2 border-0 p-0">
+                <legend class="text-sm font-medium text-stone-400">Card size</legend>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" data-density-set="compact" class="rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-sm text-stone-200 hover:bg-stone-800">Compact</button>
+                    <button type="button" data-density-set="comfortable" class="rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-sm text-stone-200 hover:bg-stone-800">Comfortable</button>
+                    <button type="button" data-density-set="spacious" class="rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-sm text-stone-200 hover:bg-stone-800">Spacious</button>
+                </div>
+            </fieldset>
+        </div>
     </div>
 
     <div id="platform-sections" class="space-y-12">
+        {% if view_mode == 'unified' %}
+        <section class="platform-section" data-platform="__unified__">
+            <div class="flex flex-wrap items-center gap-3 mb-4 pb-3 border-b border-stone-700/90">
+                <h2 class="text-lg font-medium text-stone-100">All posts</h2>
+                <span class="text-xs text-stone-500">{{ unified_sort_label }}</span>
+                <span class="feed-drag-hint text-xs text-stone-500 max-sm:hidden">Open settings and switch to “By platform” to reorder with drag handles.</span>
+            </div>
+            <ul class="sortable-link-list link-list-ul list-none p-0 m-0" data-platform="__unified__">
+                {% for link in unified_links %}
+                {% include "_link_card.html" %}
+                {% endfor %}
+            </ul>
+        </section>
+        {% else %}
         {% for platform in platform_order %}
         <section class="platform-section" data-platform="{{ platform }}">
             <div class="flex flex-wrap items-center gap-3 mb-4 pb-3 border-b border-stone-700/90">
@@ -61,7 +135,7 @@
                     <span class="select-none" aria-hidden="true">☰</span>
                 </button>
                 <h2 class="text-lg font-medium text-stone-100">{{ platform_labels.get(platform, platform) }}</h2>
-                <span class="text-xs text-stone-500 max-sm:hidden">Drag ☰ to reorder sections. Drag ⠿ on cards within this group.</span>
+                <span class="feed-drag-hint text-xs text-stone-500 max-sm:hidden">Drag ☰ to reorder sections. Drag ⠿ on cards within this group.</span>
             </div>
             <ul
                 class="sortable-link-list link-list-ul list-none p-0 m-0"
@@ -73,6 +147,7 @@
             </ul>
         </section>
         {% endfor %}
+        {% endif %}
     </div>
 </div>
 {% else %}
@@ -83,11 +158,11 @@
 {% endblock %}
 
 {% block scripts %}
-{% if platform_order and 'twitter' in platform_order %}
+{% if feed_has_links and has_twitter_embeds %}
 <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 <script src="{{ url_for('static', filename='js/twitter-embed.js') }}"></script>
 {% endif %}
-{% if platform_order %}
+{% if feed_has_links %}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script src="{{ url_for('static', filename='js/feed-layout.js') }}"></script>
 {% endif %}
