@@ -1,6 +1,6 @@
 # Link Aggregator
 
-A small web app that lets users paste social media links (YouTube, X/Twitter, TikTok) and displays them as embedded widgets on a single feed. Built with Flask, SQLite, and server-rendered templates.
+A small web app that lets users paste social media links (YouTube including Shorts, X/Twitter, TikTok, Instagram posts/reels, Facebook posts/videos) and displays them as embedded widgets on a single feed. Built with Flask, SQLite, and server-rendered templates.
 
 ## Project structure
 
@@ -49,11 +49,15 @@ social_media/
 
 3. **Environment (optional)**
 
-   Copy `.env.example` to `.env` and set:
+   Copy `.env.example` to `.env` in the project root and set:
 
    - `SECRET_KEY` – for production
    - `DATABASE_URL` – e.g. `sqlite:///instance/links.db` or a PostgreSQL URL
-   - `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` – only if you add Instagram embeds (Phase 2)
+   - `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` – Meta app credentials for Instagram and Facebook embeds
+
+   Values in `.env` are loaded automatically on startup (`python-dotenv`). Restart the server after editing `.env`.
+
+   **Virtual environment:** create `.venv` inside this project folder (`python -m venv .venv`), not in the parent `social_media` directory, so `pip` paths stay valid.
 
 ## Run
 
@@ -71,12 +75,10 @@ Then open http://127.0.0.1:5000 .
 
 ## How it works
 
-- **Submit URL** → Backend detects platform (YouTube, X, TikTok) from the URL.
-- **Fetch embed** → YouTube: iframe from video ID; X and TikTok: oEmbed API (no API keys).
+- **Submit URL** → Backend detects platform from the URL.
+- **Fetch embed** → YouTube/Shorts: iframe from video ID; X and TikTok: public oEmbed; Instagram/Facebook: Meta Graph oEmbed (requires `.env` credentials).
 - **Store** → Link and embed data are saved in SQLite (`instance/links.db` in dev).
 - **List** → Home page shows all links in a responsive grid; each is rendered as an iframe or oEmbed HTML.
-
-Instagram can be added later by configuring a Meta app and the oEmbed endpoint (see plan).
 
 ## Tech stack
 

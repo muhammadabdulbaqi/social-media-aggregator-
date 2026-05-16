@@ -9,6 +9,7 @@ from app.services.embed import (
     apply_oembed_cache_fields,
     detect_platform,
     extract_youtube_video_id,
+    fetch_embed,
     normalize_utc,
     refresh_embed_if_stale,
     utcnow,
@@ -26,6 +27,36 @@ class TestDetectPlatform(unittest.TestCase):
         self.assertEqual(
             detect_platform("https://youtu.be/dQw4w9WgXcQ"),
             "youtube",
+        )
+
+    def test_youtube_shorts(self) -> None:
+        self.assertEqual(
+            detect_platform("https://www.youtube.com/shorts/dQw4w9WgXcQ"),
+            "youtube",
+        )
+
+    def test_instagram_reel(self) -> None:
+        self.assertEqual(
+            detect_platform("https://www.instagram.com/reel/ABC123xyz/"),
+            "instagram",
+        )
+
+    def test_instagram_mobile(self) -> None:
+        self.assertEqual(
+            detect_platform("https://m.instagram.com/p/ABC123xyz/"),
+            "instagram",
+        )
+
+    def test_url_without_scheme(self) -> None:
+        self.assertEqual(
+            detect_platform("www.youtube.com/watch?v=dQw4w9WgXcQ"),
+            "youtube",
+        )
+
+    def test_facebook_post(self) -> None:
+        self.assertEqual(
+            detect_platform("https://www.facebook.com/page/posts/1234567890"),
+            "facebook",
         )
 
     def test_x_status(self) -> None:
@@ -68,6 +99,43 @@ class TestExtractYoutube(unittest.TestCase):
             extract_youtube_video_id("https://www.youtube.com/watch?v=abcDEF12345"),
             "abcDEF12345",
         )
+
+    def test_shorts_id(self) -> None:
+        self.assertEqual(
+            extract_youtube_video_id("https://www.youtube.com/shorts/abcDEF12345"),
+            "abcDEF12345",
+        )
+
+
+class TestMetaEmbedFallback(unittest.TestCase):
+    def setUp(self) -> None:
+        self.app = create_app("testing")
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+        self.app.config["INSTAGRAM_APP_ID"] = "test-app-id"
+        self.app.config["INSTAGRAM_APP_SECRET"] = "test-secret"
+
+    def tearDown(self) -> None:
+        self.ctx.pop()
+
+    @patch("app.services.embed._fetch_meta_oembed")
+    def test_instagram_falls_back_to_iframe_when_graph_fails(self, mock_meta) -> None:
+        mock_meta.side_effect = ValueError("Graph API error")
+        html, video_id, title = fetch_embed(
+            "https://www.instagram.com/p/ABC123xyz/",
+            "instagram",
+        )
+        self.assertIsNone(video_id)
+        self.assertIsNone(title)
+        self.assertIn("instagram.com/p/ABC123xyz/embed", html or "")
+
+    @patch("app.services.embed._fetch_meta_oembed")
+    def test_facebook_falls_back_to_iframe_when_graph_fails(self, mock_meta) -> None:
+        mock_meta.side_effect = ValueError("Graph API error")
+        url = "https://www.facebook.com/somepage/posts/1234567890"
+        html, video_id, title = fetch_embed(url, "facebook")
+        self.assertIsNone(video_id)
+        self.assertIn("facebook.com/plugins/post.php", html or "")
 
 
 class TestOembedCache(unittest.TestCase):

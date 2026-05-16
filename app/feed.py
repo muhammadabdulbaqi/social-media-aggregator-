@@ -6,14 +6,23 @@ from collections import defaultdict
 from app import db
 from app.models import Link
 
-DEFAULT_PLATFORM_ORDER = ["youtube", "twitter", "tiktok", "instagram"]
+DEFAULT_PLATFORM_ORDER = ["youtube", "twitter", "tiktok", "instagram", "facebook"]
 
 PLATFORM_LABELS = {
     "youtube": "YouTube",
     "twitter": "X (Twitter)",
     "tiktok": "TikTok",
     "instagram": "Instagram",
+    "facebook": "Facebook",
 }
+
+# Homepage subtitle only — keep short; no setup/credential copy.
+SUPPORTED_PLATFORMS_UI = (
+    "Paste a link from YouTube, X, TikTok, Instagram, or Facebook."
+)
+
+# Flash when URL does not match any supported host/path.
+UNSUPPORTED_URL_MESSAGE = "That link isn't supported."
 
 
 def group_links_by_platform(links: list[Link]) -> dict[str, list[Link]]:

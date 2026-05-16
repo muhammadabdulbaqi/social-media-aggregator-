@@ -2,6 +2,11 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Project root `.env` (gitignored); load before Config reads os.environ.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 
 class Config:
     """Base configuration."""
@@ -11,7 +16,7 @@ class Config:
     # oEmbed HTML (X, TikTok, Instagram): refetch after this many seconds when serving the feed.
     OEMBED_CACHE_TTL_SECONDS = int(os.environ.get("OEMBED_CACHE_TTL_SECONDS", "86400"))
 
-    # Optional: Instagram oEmbed (Phase 2)
+    # Meta app credentials (Instagram + Facebook Graph oEmbed)
     INSTAGRAM_APP_ID = os.environ.get("INSTAGRAM_APP_ID")
     INSTAGRAM_APP_SECRET = os.environ.get("INSTAGRAM_APP_SECRET")
 

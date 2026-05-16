@@ -39,7 +39,7 @@
             class="w-full aspect-video max-w-full rounded-lg"
         ></iframe>
         {% elif link.embed_html %}
-        <div class="w-full [&>blockquote]:mx-auto [&_.twitter-tweet]:mx-auto">
+        <div class="w-full [&>blockquote]:mx-auto [&_.twitter-tweet]:mx-auto [&_iframe]:mx-auto [&_iframe]:rounded-lg">
             {{ link.embed_html | safe }}
         </div>
         {% endif %}

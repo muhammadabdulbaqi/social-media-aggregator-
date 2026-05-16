@@ -4,6 +4,8 @@ from flask import Blueprint, current_app, flash, make_response, redirect, render
 from app import db
 from app.feed import (
     PLATFORM_LABELS,
+    SUPPORTED_PLATFORMS_UI,
+    UNSUPPORTED_URL_MESSAGE,
     group_links_by_platform,
     next_sort_order_for_platform,
     ordered_platform_keys,
@@ -14,6 +16,7 @@ from app.services import (
     apply_oembed_cache_fields,
     detect_platform,
     fetch_embed,
+    normalize_paste_url,
     refresh_embed_if_stale,
 )
 
@@ -52,6 +55,7 @@ def index():
         link_groups=link_groups,
         platform_order=platform_order,
         platform_labels=PLATFORM_LABELS,
+        supported_platforms_ui=SUPPORTED_PLATFORMS_UI,
         view_mode=view_mode,
         unified_sort=unified_sort,
         unified_links=unified_links,
@@ -73,7 +77,7 @@ def add_link():
     else:
         url = request.form.get("url", "")
 
-    url = url.strip()
+    url = normalize_paste_url(url)
     if not url:
         if request.is_json:
             return {"error": "URL is required"}, 400
@@ -83,10 +87,8 @@ def add_link():
     platform = detect_platform(url)
     if not platform:
         if request.is_json:
-            return {
-                "error": "Unsupported URL. Use YouTube, X (Twitter), or TikTok links.",
-            }, 400
-        flash("Unsupported URL. Use YouTube, X (Twitter), or TikTok links.", "error")
+            return {"error": UNSUPPORTED_URL_MESSAGE}, 400
+        flash(UNSUPPORTED_URL_MESSAGE, "error")
         return redirect(url_for("main.index"))
 
     try:

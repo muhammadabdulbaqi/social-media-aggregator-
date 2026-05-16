@@ -6,7 +6,7 @@
 {% set unified_sort_label = 'Newest first' if unified_sort == 'recent' else 'Oldest first' %}
 <header class="mb-10">
     <h1 class="text-3xl font-semibold text-stone-100 tracking-tight">Link aggregator</h1>
-    <p class="mt-1 text-stone-400">Paste a YouTube, X (Twitter), or TikTok link to embed it below.</p>
+    <p class="mt-1 text-stone-400">{{ supported_platforms_ui }}</p>
 </header>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -155,7 +155,7 @@
 </div>
 {% else %}
 <section class="rounded-xl border border-dashed border-stone-600 bg-stone-900/30 py-16 text-center">
-    <p class="text-stone-500">No links yet. Paste a YouTube, X, or TikTok URL above and click Add link.</p>
+    <p class="text-stone-500">No links yet. Paste a URL above to get started.</p>
 </section>
 {% endif %}
 {% endblock %}

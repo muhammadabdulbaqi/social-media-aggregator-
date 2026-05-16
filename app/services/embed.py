@@ -5,7 +5,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Tuple
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import requests
 from flask import current_app
@@ -26,6 +26,7 @@ _OEMBED_HEADERS = {
 
 YOUTUBE_PATTERNS = [
     re.compile(r"(?:youtube\.com/watch\?v=)([a-zA-Z0-9_-]{11})"),
+    re.compile(r"(?:youtube\.com/shorts/)([a-zA-Z0-9_-]{11})"),
     re.compile(r"(?:youtu\.be/)([a-zA-Z0-9_-]{11})"),
 ]
 TWITTER_PATTERN = re.compile(
@@ -38,9 +39,26 @@ TIKTOK_VIDEO_PATTERN = re.compile(
     re.I,
 )
 INSTAGRAM_PATTERN = re.compile(
-    r"https?://(?:www\.)?instagram\.com/(?:p|reel)/([a-zA-Z0-9_-]+)",
+    r"https?://(?:www\.|m\.)?instagram\.com/(?:p|reels?)/([a-zA-Z0-9_-]+)",
     re.I,
 )
+FACEBOOK_PATTERNS = [
+    re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/.+/posts/", re.I),
+    re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/share/", re.I),
+    re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/permalink\.php", re.I),
+    re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/photo\.php", re.I),
+    re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/story\.php", re.I),
+    re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/watch", re.I),
+    re.compile(r"https?://(?:www\.)?fb\.watch/", re.I),
+]
+
+
+def normalize_paste_url(url: str) -> str:
+    """Trim and ensure a scheme so detection works on bare domains."""
+    url = (url or "").strip()
+    if url and not re.match(r"^https?://", url, re.I):
+        url = "https://" + url
+    return url
 
 
 def _host_is_tiktok(url: str) -> bool:
@@ -55,8 +73,8 @@ def _host_is_tiktok(url: str) -> bool:
 
 
 def detect_platform(url: str) -> str | None:
-    """Return platform name (youtube, twitter, tiktok, instagram) or None if unsupported."""
-    url = (url or "").strip()
+    """Return platform name or None if unsupported."""
+    url = normalize_paste_url(url)
     if not url:
         return None
     for p in YOUTUBE_PATTERNS:
@@ -68,7 +86,128 @@ def detect_platform(url: str) -> str | None:
         return "tiktok"
     if INSTAGRAM_PATTERN.search(url):
         return "instagram"
+    for p in FACEBOOK_PATTERNS:
+        if p.search(url):
+            return "facebook"
     return None
+
+
+def _meta_credentials_configured() -> bool:
+    return bool(
+        current_app.config.get("INSTAGRAM_APP_ID")
+        and current_app.config.get("INSTAGRAM_APP_SECRET")
+    )
+
+
+def _meta_app_access_token() -> str:
+    """App access token for Meta Graph oEmbed (app_id|app_secret)."""
+    app_id = current_app.config.get("INSTAGRAM_APP_ID")
+    app_secret = current_app.config.get("INSTAGRAM_APP_SECRET")
+    if not app_id or not app_secret:
+        raise ValueError("This embed type isn't available right now.")
+    return f"{app_id}|{app_secret}"
+
+
+def _facebook_oembed_endpoint(url: str) -> str:
+    lower = url.lower()
+    if "fb.watch" in lower or "/watch" in lower:
+        return "oembed_video"
+    return "oembed_post"
+
+
+def _canonical_instagram_url(url: str) -> str:
+    """Strip tracking params; use stable /p/ or /reel/ path for oEmbed."""
+    m = INSTAGRAM_PATTERN.search(url)
+    if not m:
+        return url
+    kind = "reel" if re.search(r"/reels?/", url, re.I) else "p"
+    return f"https://www.instagram.com/{kind}/{m.group(1)}/"
+
+
+def _instagram_iframe_embed(url: str) -> str:
+    m = INSTAGRAM_PATTERN.search(url)
+    if not m:
+        raise ValueError("Couldn't embed this Instagram link.")
+    kind = "reel" if re.search(r"/reels?/", url, re.I) else "p"
+    src = f"https://www.instagram.com/{kind}/{m.group(1)}/embed/captioned/"
+    return (
+        f'<iframe src="{src}" class="instagram-embed-iframe w-full max-w-full" '
+        f'width="400" height="480" frameborder="0" scrolling="no" '
+        f'allowtransparency="true" allowfullscreen '
+        f'style="border:0;overflow:hidden;min-height:480px;"></iframe>'
+    )
+
+
+def _facebook_iframe_embed(url: str) -> str:
+    encoded = quote(url, safe="")
+    if _facebook_oembed_endpoint(url) == "oembed_video":
+        src = (
+            f"https://www.facebook.com/plugins/video.php?href={encoded}"
+            "&show_text=false&width=560"
+        )
+        height = 476
+    else:
+        src = (
+            f"https://www.facebook.com/plugins/post.php?href={encoded}"
+            "&show_text=true&width=500"
+        )
+        height = 600
+    return (
+        f'<iframe src="{src}" class="facebook-embed-iframe w-full max-w-full" '
+        f'width="500" height="{height}" style="border:none;overflow:hidden" '
+        f'scrolling="no" frameborder="0" allowfullscreen="true" '
+        f'allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share">'
+        f"</iframe>"
+    )
+
+
+def _fetch_meta_oembed(url: str, endpoint: str, provider: str) -> Tuple[str | None, str | None, str | None]:
+    token = _meta_app_access_token()
+    r = requests.get(
+        f"https://graph.facebook.com/v22.0/{endpoint}",
+        params={"url": url, "access_token": token, "omitscript": "true"},
+        headers=_OEMBED_HEADERS,
+        timeout=15,
+    )
+    if not r.ok:
+        detail = _graph_error_message(r)
+        logger.warning("Meta %s oEmbed HTTP %s: %s", provider, r.status_code, detail)
+        raise ValueError(detail or f"{provider} embed request failed")
+    data = r.json()
+    html = data.get("html")
+    if not html:
+        raise ValueError(
+            f"{provider} did not return embed HTML. The post may be private or unavailable."
+        )
+    return html, None, data.get("title") or data.get("author_name")
+
+
+def _graph_error_message(r: requests.Response) -> str | None:
+    try:
+        err = r.json().get("error") or {}
+        return err.get("message") or err.get("error_user_msg")
+    except Exception:
+        return None
+
+
+def _fetch_instagram_embed(url: str) -> Tuple[str | None, str | None, str | None]:
+    url = _canonical_instagram_url(url)
+    if _meta_credentials_configured():
+        try:
+            return _fetch_meta_oembed(url, "instagram_oembed", "Instagram")
+        except ValueError:
+            pass
+    return _instagram_iframe_embed(url), None, None
+
+
+def _fetch_facebook_embed(url: str) -> Tuple[str | None, str | None, str | None]:
+    if _meta_credentials_configured():
+        try:
+            endpoint = _facebook_oembed_endpoint(url)
+            return _fetch_meta_oembed(url, endpoint, "Facebook")
+        except ValueError:
+            pass
+    return _facebook_iframe_embed(url), None, None
 
 
 def extract_youtube_video_id(url: str) -> str | None:
@@ -86,6 +225,7 @@ def fetch_embed(url: str, platform: str) -> Tuple[str | None, str | None, str | 
     Returns (embed_html, video_id, title). YouTube returns (None, video_id, None).
     Raises ValueError on invalid URL or fetch error.
     """
+    url = normalize_paste_url(url)
     if platform == "youtube":
         video_id = extract_youtube_video_id(url)
         if not video_id:
@@ -125,33 +265,10 @@ def fetch_embed(url: str, platform: str) -> Tuple[str | None, str | None, str | 
         return html, None, data.get("title")
 
     if platform == "instagram":
-        app_id = current_app.config.get("INSTAGRAM_APP_ID")
-        app_secret = current_app.config.get("INSTAGRAM_APP_SECRET")
-        if not app_id or not app_secret:
-            raise ValueError(
-                "Instagram not configured. Set INSTAGRAM_APP_ID and INSTAGRAM_APP_SECRET."
-            )
-        token_r = requests.get(
-            "https://graph.facebook.com/oauth/access_token",
-            params={
-                "client_id": app_id,
-                "client_secret": app_secret,
-                "grant_type": "client_credentials",
-            },
-            timeout=10,
-        )
-        token_r.raise_for_status()
-        token = token_r.json().get("access_token")
-        if not token:
-            raise ValueError("Failed to get Instagram access token")
-        r = requests.get(
-            "https://graph.facebook.com/v21.0/instagram_oembed",
-            params={"url": url, "access_token": token},
-            timeout=10,
-        )
-        r.raise_for_status()
-        data = r.json()
-        return data.get("html"), None, None
+        return _fetch_instagram_embed(url)
+
+    if platform == "facebook":
+        return _fetch_facebook_embed(url)
 
     raise ValueError(f"Unsupported platform: {platform}")
 
